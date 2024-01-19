@@ -25,13 +25,17 @@ RSpec.describe Validadores, type: :lib do
 
       it "salva arquivo na base e calcula performance total" do
         @file = File.open(arquivo_valido[:file])
+        performances = []
 
         CSV.foreach(@file, {headers: true, header_converters: :symbol, col_sep: ';'}) do |row|
           break unless Validadores.data(row[:periodo])
           cliente = Cliente.create!(nome: row[:cliente])
           resultado = cliente.resultado.create!(periodo: row[:periodo], valor_meta: row[:valor_meta], valor_realizado: row[:valor_realizado])
+
+          performances.push(Calculos.performance(row[:valor_meta],row[:valor_realizado]))
         end
 
+        puts performances
         expect(Cliente.all.size).to eq(3)
       end
     end
@@ -51,14 +55,21 @@ RSpec.describe Validadores, type: :lib do
 
       it "inserindo linhas na base somente se arquivo valido" do
         @file = File.open(arquivo_invalido[:file])
+        todas_validas = true
 
         CSV.foreach(@file, {headers: true, header_converters: :symbol, col_sep: ';'}) do |row|
-          break unless Validadores.data(row[:periodo])
-          cliente = Cliente.create!(nome: row[:cliente])
-          cliente.resultado.create!(periodo: row[:periodo], valor_meta: row[:valor_meta], valor_realizado: row[:valor_realizado])
+          todas_validas = false unless Validadores.data(row[:periodo])
         end
 
-        expect(Cliente.all.size).to eq(2)
+        if todas_validas
+          CSV.foreach(@file, {headers: true, header_converters: :symbol, col_sep: ';'}) do |row|
+            break unless Validadores.data(row[:periodo])
+            cliente = Cliente.create!(nome: row[:cliente])
+            resultado = cliente.resultado.create!(periodo: row[:periodo], valor_meta: row[:valor_meta], valor_realizado: row[:valor_realizado])
+          end
+        end
+
+        expect(Cliente.all.size).to eq(0)
       end
     end
   end
